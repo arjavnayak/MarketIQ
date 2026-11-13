@@ -18,6 +18,16 @@ The first release includes:
 
 > **Data disclaimer:** Every price, index level, return, date and market movement currently displayed is illustrative demo data. It is not live market data and must not be used for investment decisions.
 
+## Private deployment access
+
+The application uses HTTP Basic Authentication. Configure the following environment variable in the hosting provider before accessing the site:
+
+- `MARKETIQ_PASSWORD`: a strong, unique password for the private workspace.
+
+The username is `analyst`. The site fails closed with HTTP 503 if the password is not configured, and otherwise challenges visitors for authentication. Never commit the password or market-data API keys to GitHub.
+
+For Vercel, add `MARKETIQ_PASSWORD` under **Project → Settings → Environment Variables**, apply it to Production (and Preview if needed), then redeploy. Use a long, unique password and share it only with yourself.
+
 ## Run locally
 
 Requirements: Node.js 20.9 or later.
