@@ -103,7 +103,7 @@ export default function Dashboard() {
     return () => { cancelled = true; };
   }, []);
 
-  const liveStocks = useMemo(() => stocks.map(stock => ({ ...stock, ...(marketData[stock.symbol] ?? {}) })), [marketData]);
+  const liveStocks = useMemo(() => stocks.filter(stock => Boolean(marketData[stock.symbol])).map(stock => ({ ...stock, ...marketData[stock.symbol] })), [marketData]);
   const filtered = useMemo(() => liveStocks.filter(stock =>
     `${stock.symbol} ${stock.company} ${stock.sector}`.toLowerCase().includes(search.toLowerCase()) &&
     (active !== "Watchlist" || watchlist.includes(stock.symbol)) &&
