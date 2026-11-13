@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Activity, ArrowDownRight, ArrowUpRight, Bell, Building2, ChartNoAxesCombined,
   ChevronDown, CircleHelp, FileText, Globe2, LayoutDashboard, Menu, Newspaper,
@@ -60,13 +60,56 @@ export default function Dashboard() {
   const [watchlist, setWatchlist] = useState(["RELIANCE", "HDFCBANK", "INFY", "TCS"]);
   const [showAll, setShowAll] = useState(false);
   const [mobileNav, setMobileNav] = useState(false);
+  const [marketData, setMarketData] = useState<Record<string, { price: string; change: string; positive: boolean; date: string }>>({});
+  const [dataLoading, setDataLoading] = useState(true);
+  const [dataError, setDataError] = useState("");
 
-  const filtered = useMemo(() => stocks.filter(stock =>
+  useEffect(() => {
+    let cancelled = false;
+    async function loadMarketData() {
+      const results = await Promise.all(stocks.map(async (stock) => {
+        try {
+          const response = await fetch(`/api/market/ohlcv/${stock.symbol}`);
+          if (!response.ok) throw new Error(`Unable to load ${stock.symbol}`);
+          const payload = await response.json();
+          const rows = Array.isArray(payload.data) ? payload.data : [];
+          if (rows.length < 2) return null;
+          const latest = rows[rows.length - 1];
+          const previous = rows[rows.length - 2];
+          const close = Number(latest.close);
+          const previousClose = Number(previous.close);
+          if (!Number.isFinite(close) || !Number.isFinite(previousClose) || previousClose === 0) return null;
+          const pct = ((close - previousClose) / previousClose) * 100;
+          return [stock.symbol, {
+            price: new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(close),
+            change: `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
+            positive: pct >= 0,
+            date: String(latest.date),
+          }] as const;
+        } catch {
+          return null;
+        }
+      }));
+      if (cancelled) return;
+      const next: Record<string, { price: string; change: string; positive: boolean; date: string }> = {};
+      for (const result of results) if (result) next[result[0]] = result[1];
+      setMarketData(next);
+      setDataLoading(false);
+      if (Object.keys(next).length === 0) setDataError("TejHQ data is temporarily unavailable. Please try again later.");
+      else if (Object.keys(next).length < stocks.length) setDataError("Some symbols could not be loaded. Available quotes are shown.");
+      else setDataError("");
+    }
+    loadMarketData();
+    return () => { cancelled = true; };
+  }, []);
+
+  const liveStocks = useMemo(() => stocks.map(stock => ({ ...stock, ...(marketData[stock.symbol] ?? {}) })), [marketData]);
+  const filtered = useMemo(() => liveStocks.filter(stock =>
     `${stock.symbol} ${stock.company} ${stock.sector}`.toLowerCase().includes(search.toLowerCase()) &&
     (active !== "Watchlist" || watchlist.includes(stock.symbol)) &&
     (sectorFilter === "All sectors" || stock.sector === sectorFilter)
-  ), [search, active, watchlist, sectorFilter]);
-  const moverStocks = stocks.filter(stock => moverMode === "Gainers" ? stock.positive : !stock.positive).slice(0, 4);
+  ), [liveStocks, search, active, watchlist, sectorFilter]);
+  const moverStocks = liveStocks.filter(stock => moverMode === "Gainers" ? stock.positive : !stock.positive).slice(0, 4);
   const visible = showAll ? filtered : filtered.slice(0, 5);
 
   function toggleWatch(symbol: string) {
@@ -82,25 +125,25 @@ export default function Dashboard() {
     </aside>
     {mobileNav && <button className="nav-backdrop" onClick={() => setMobileNav(false)} aria-label="Close navigation" />}
     <section className="main-area">
-      <header className="topbar"><div className="top-left"><button className="icon-btn open-nav" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu size={19} /></button><div className="crumb">Workspace <span>/</span> <b>{active}</b></div></div><div className="top-actions"><div className="market-pill"><i /> DEMO MARKET DATA</div><button className="icon-btn notification" aria-label="Notifications"><Bell size={18} /><i /></button><div className="top-user">AJ</div></div></header>
+      <header className="topbar"><div className="top-left"><button className="icon-btn open-nav" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu size={19} /></button><div className="crumb">Workspace <span>/</span> <b>{active}</b></div></div><div className="top-actions"><div className="market-pill"><i /> {dataLoading ? "CONNECTING TEJHQ" : Object.keys(marketData).length ? "TEJHQ · EOD DATA" : "DATA UNAVAILABLE"}</div><button className="icon-btn notification" aria-label="Notifications"><Bell size={18} /><i /></button><div className="top-user">AJ</div></div></header>
       <div className="content">
         <div className="page-title"><div><div className="eyebrow">INDIA <span>·</span> MARKET SNAPSHOT</div><h1>{active === "Overview" ? "Market overview" : active}</h1><p>Your daily view of Indian equity markets and the signals moving them.</p></div><button className="snapshot-btn">Market snapshot <ChevronDown size={14} /></button></div>
-        <div className="notice"><Sparkles size={16} /><span><b>Welcome to MarketIQ.</b> All figures on this preview are illustrative demo values, not live market quotes.</span><button onClick={() => setActive("Company analysis")}>Explore research <span>→</span></button></div>
+        <div className="notice"><Sparkles size={16} /><span><b>TejHQ end-of-day data.</b> Stock prices are daily closing prices, usually updated by the next morning. Index cards and index chart remain illustrative.</span><button onClick={() => setActive("Company analysis")}>Explore research <span>→</span></button></div>{dataError && <div className="notice"><span>{dataError}</span></div>}
 
         <section className="index-grid">{indices.map(index => <article className="index-card" key={index.name}><div className="index-top"><span>{index.name}</span><small><i /> DEMO</small></div><div className="index-value">{index.value}</div><div className={`index-change ${index.positive ? "up" : "down"}`}>{index.positive ? <ArrowUpRight size={15} /> : <ArrowDownRight size={15} />}{index.change}<span>today</span></div><div className="index-spark"><Sparkline points={index.points} positive={index.positive} /></div><div className="index-foot"><span>{index.sub}</span><span>Illustrative</span></div></article>)}</section>
 
         <section className="primary-grid">
           <article className="panel chart-panel"><div className="panel-head"><div><div className="panel-kicker">MARKET PERFORMANCE</div><h2>NIFTY 50 <span className="up">+0.82%</span></h2><p>Illustrative index movement</p></div><button className="select-btn">NIFTY 50 <ChevronDown size={13} /></button></div><div className="chart-value"><strong>24,854.05</strong><span>+202.45 (+0.82%)</span></div><div className="chart-wrap"><div className="y-axis"><span>25,000</span><span>24,900</span><span>24,800</span><span>24,700</span></div><div className="chart-plot"><MainChart /><div className="x-axis"><span>09:15</span><span>10:30</span><span>11:45</span><span>13:00</span><span>14:15</span><span>15:30</span></div></div></div><div className="range-tabs">{["1D", "1W", "1M", "3M", "6M", "1Y", "ALL"].map(item => <button key={item} onClick={() => setRange(item)} className={range === item ? "selected" : ""}>{item}</button>)}</div></article>
-          <article className="panel movers"><div className="panel-head"><div><div className="panel-kicker">MARKET PULSE</div><h2>Top movers</h2><p>Selected stocks · Demo values</p></div><button className="text-btn" onClick={() => setActive("Markets")}>View all →</button></div><div className="mover-tabs"><button className={moverMode === "Gainers" ? "chosen" : ""} onClick={() => setMoverMode("Gainers")}>Gainers</button><button className={moverMode === "Losers" ? "chosen" : ""} onClick={() => setMoverMode("Losers")}>Losers</button></div>{moverStocks.map(stock => <div className="mover-row" key={stock.symbol}><div className="stock-logo">{stock.symbol.slice(0, 1)}</div><div className="mover-name"><b>{stock.symbol}</b><small>{stock.sector}</small></div><div className="mover-quote"><b>₹{stock.price}</b><small className={stock.positive ? "up" : "down"}>{stock.change}</small></div></div>)}</article>
+          <article className="panel movers"><div className="panel-head"><div><div className="panel-kicker">MARKET PULSE</div><h2>Top movers</h2><p>Selected stocks · Latest daily close</p></div><button className="text-btn" onClick={() => setActive("Markets")}>View all →</button></div><div className="mover-tabs"><button className={moverMode === "Gainers" ? "chosen" : ""} onClick={() => setMoverMode("Gainers")}>Gainers</button><button className={moverMode === "Losers" ? "chosen" : ""} onClick={() => setMoverMode("Losers")}>Losers</button></div>{moverStocks.map(stock => <div className="mover-row" key={stock.symbol}><div className="stock-logo">{stock.symbol.slice(0, 1)}</div><div className="mover-name"><b>{stock.symbol}</b><small>{stock.sector}</small></div><div className="mover-quote"><b>₹{stock.price}</b><small className={stock.positive ? "up" : "down"}>{stock.change}</small></div></div>)}</article>
         </section>
 
         <section className="lower-grid">
-          <article className="panel watch-panel"><div className="panel-head"><div><div className="panel-kicker">YOUR TRACKING</div><h2>Market watchlist</h2><p>Keep an eye on companies that matter to you.</p></div><button className="add-btn" onClick={() => setShowAll(value => !value)}>{showAll ? "Show fewer" : "Browse all stocks"}</button></div><div className="table-tools"><div className="search-box"><Search size={15} /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search stocks..." /></div><select className="filter-btn" aria-label="Filter by sector" value={sectorFilter} onChange={event => setSectorFilter(event.target.value)}><option>All sectors</option>{Array.from(new Set(stocks.map(stock => stock.sector))).map(sector => <option key={sector}>{sector}</option>)}</select></div><div className="table-scroll"><table><thead><tr><th>COMPANY</th><th>SECTOR</th><th className="align-right">LAST PRICE</th><th className="align-right">CHANGE</th><th /></tr></thead><tbody>{visible.map(stock => <tr key={stock.symbol}><td><div className="company-cell"><div className="stock-logo">{stock.symbol.slice(0, 1)}</div><span><b>{stock.symbol}</b><small>{stock.company}</small></span></div></td><td><span className="sector-tag">{stock.sector}</span></td><td className="align-right mono">₹{stock.price}</td><td className={`align-right mono ${stock.positive ? "up" : "down"}`}>{stock.change}</td><td className="align-right"><button className={`star-btn ${watchlist.includes(stock.symbol) ? "starred" : ""}`} onClick={() => toggleWatch(stock.symbol)} aria-label={watchlist.includes(stock.symbol) ? "Remove from watchlist" : "Add to watchlist"}><Star size={15} fill={watchlist.includes(stock.symbol) ? "currentColor" : "none"} /></button></td></tr>)}</tbody></table>{visible.length === 0 && <div className="empty">No stocks match your search.</div>}</div><div className="table-foot"><span>{active === "Watchlist" ? "Your watchlist" : "Showing"} {visible.length} of {filtered.length} sample companies</span><button onClick={() => setShowAll(value => !value)}>{showAll ? "Show less" : "View all stocks"} →</button></div></article>
-          <article className="panel sectors"><div className="panel-head"><div><div className="panel-kicker">SECTOR MONITOR</div><h2>Sector performance</h2><p>Illustrative daily returns</p></div></div>{[["Banking",82,"+1.42%",true],["Automobile",68,"+1.08%",true],["Energy",57,"+0.76%",true],["FMCG",42,"+0.31%",true],["Information Technology",29,"-0.64%",false],["Pharma",18,"-0.92%",false]].map(([name,width,change,positive]) => <div className="sector-row" key={String(name)}><div><span>{name}</span><b className={positive ? "up" : "down"}>{change}</b></div><div className="sector-track"><i className={positive ? "gain" : "loss"} style={{width:`${width}%`}} /></div></div>)}</article>
+          <article className="panel watch-panel"><div className="panel-head"><div><div className="panel-kicker">YOUR TRACKING</div><h2>Market watchlist</h2><p>Latest available NSE daily closing prices.</p></div><button className="add-btn" onClick={() => setShowAll(value => !value)}>{showAll ? "Show fewer" : "Browse all stocks"}</button></div><div className="table-tools"><div className="search-box"><Search size={15} /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search stocks..." /></div><select className="filter-btn" aria-label="Filter by sector" value={sectorFilter} onChange={event => setSectorFilter(event.target.value)}><option>All sectors</option>{Array.from(new Set(stocks.map(stock => stock.sector))).map(sector => <option key={sector}>{sector}</option>)}</select></div><div className="table-scroll"><table><thead><tr><th>COMPANY</th><th>SECTOR</th><th className="align-right">LAST PRICE</th><th className="align-right">CHANGE</th><th /></tr></thead><tbody>{visible.map(stock => <tr key={stock.symbol}><td><div className="company-cell"><div className="stock-logo">{stock.symbol.slice(0, 1)}</div><span><b>{stock.symbol}</b><small>{stock.company}</small></span></div></td><td><span className="sector-tag">{stock.sector}</span></td><td className="align-right mono">₹{stock.price}</td><td className={`align-right mono ${stock.positive ? "up" : "down"}`}>{stock.change}</td><td className="align-right"><button className={`star-btn ${watchlist.includes(stock.symbol) ? "starred" : ""}`} onClick={() => toggleWatch(stock.symbol)} aria-label={watchlist.includes(stock.symbol) ? "Remove from watchlist" : "Add to watchlist"}><Star size={15} fill={watchlist.includes(stock.symbol) ? "currentColor" : "none"} /></button></td></tr>)}</tbody></table>{visible.length === 0 && <div className="empty">No stocks match your search.</div>}</div><div className="table-foot"><span>{active === "Watchlist" ? "Your watchlist" : "Showing"} {visible.length} of {filtered.length} companies · {dataLoading ? "Loading prices…" : "TejHQ daily close"}</span><button onClick={() => setShowAll(value => !value)}>{showAll ? "Show less" : "View all stocks"} →</button></div></article>
+          <article className="panel sectors"><div className="panel-head"><div><div className="panel-kicker">SECTOR MONITOR</div><h2>Sector performance</h2><p>Illustrative sector returns · not yet connected</p></div></div>{[["Banking",82,"+1.42%",true],["Automobile",68,"+1.08%",true],["Energy",57,"+0.76%",true],["FMCG",42,"+0.31%",true],["Information Technology",29,"-0.64%",false],["Pharma",18,"-0.92%",false]].map(([name,width,change,positive]) => <div className="sector-row" key={String(name)}><div><span>{name}</span><b className={positive ? "up" : "down"}>{change}</b></div><div className="sector-track"><i className={positive ? "gain" : "loss"} style={{width:`${width}%`}} /></div></div>)}</article>
         </section>
 
         <section className="research-grid"><article className="panel research-card"><div className="research-icon"><Sparkles size={18} /></div><div><div className="panel-kicker">COMING NEXT</div><h3>AI research analyst</h3><p>Company deep-dives, financial statement interpretation and valuation insights in one workflow.</p></div><button onClick={() => setActive("Company analysis")}>Explore →</button></article><article className="panel research-card"><div className="research-icon violet"><FileText size={18} /></div><div><div className="panel-kicker">RESEARCH DESK</div><h3>Company intelligence</h3><p>Track quarterly results, key ratios, cash flows and long-term financial performance.</p></div><button onClick={() => setActive("Company analysis")}>Explore →</button></article></section>
-        <footer className="footer"><span>MARKETIQ <b>·</b> BUILT FOR BETTER RESEARCH</span><span>Demo interface · No live market data connected</span><span>India <Globe2 size={12} /></span></footer>
+        <footer className="footer"><span>MARKETIQ <b>·</b> BUILT FOR BETTER RESEARCH</span><span>Private workspace · TejHQ end-of-day stock data</span><span>India <Globe2 size={12} /></span></footer>
       </div>
     </section>
   </main>;
