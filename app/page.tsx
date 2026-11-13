@@ -85,7 +85,7 @@ export default function Dashboard() {
       const next: Record<string, { price: string; change: string; positive: boolean; date: string }> = {};
       const failures: string[] = [];
       for (const result of results) {
-        if ("quote" in result) next[result.symbol] = result.quote;
+        if (result.quote) next[result.symbol] = result.quote;
         else failures.push(`${result.symbol}: ${result.error}`);
       }
       setMarketData(next);
