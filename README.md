@@ -2,42 +2,53 @@
 
 **Indian Stock Market Intelligence Platform**
 
-MarketIQ is a research and analytics workspace for NSE and BSE equities, inspired by professional financial terminals.
+MarketIQ is a private research and analytics workspace for Indian equities, inspired by professional financial terminals.
 
-## Current milestone: dashboard foundation
+## Current status
 
-The first release includes:
-- Dark, responsive market-intelligence dashboard
-- NIFTY 50, SENSEX and BANK NIFTY overview cards
-- Illustrative market-performance chart
-- Selected top movers
-- Searchable sample stock table
-- Interactive watchlist stars
-- Sector performance monitor
-- Responsive navigation
+The dashboard foundation includes:
+- Responsive dark market-intelligence interface
+- Searchable NSE stock watchlist with saved-in-session watchlist toggles
+- Gainers and losers view based only on prices returned by the configured data endpoint
+- NSE advances, declines and unchanged cards when a valid market snapshot is available
+- Explicit unavailable-data states for index charts and sector returns
+- Private workspace access through HTTP Basic Authentication
 
-> **Data disclaimer:** Every price, index level, return, date and market movement currently displayed is illustrative demo data. It is not live market data and must not be used for investment decisions.
+**Data integrity:** The application must not display invented stock prices, index levels, charts or sector returns. If a data source is unavailable, the dashboard should show an unavailable state instead.
 
-## Private deployment access
+## Market-data restrictions
 
-The application uses HTTP Basic Authentication. Configure the following environment variable in the hosting provider before accessing the site:
+The current TejHQ integration provides end-of-day NSE stock data. Its free-data terms restrict use to private personal dashboards and do not establish permission to display or redistribute the data on a public product. Keep MarketIQ private while using this source. Do not enable public access or redistribute raw market data unless the relevant provider and exchange display rights explicitly permit it.
 
-- `MARKETIQ_PASSWORD`: a strong, unique password for the private workspace.
+TejHQ does not supply official NIFTY 50, SENSEX or BANK NIFTY index values through the current integration. Those charts remain unavailable until a suitable data source is approved.
 
-The username is `analyst`. The site fails closed with HTTP 503 if the password is not configured, and otherwise challenges visitors for authentication. Never commit the password or market-data API keys to GitHub.
+## Private access
 
-For Vercel, add `MARKETIQ_PASSWORD` under **Project → Settings → Environment Variables**, apply it to Production (and Preview if needed), then redeploy. Use a long, unique password and share it only with yourself.
+The application uses HTTP Basic Authentication. Configure the environment variable `MARKETIQ_PASSWORD` in the hosting provider before accessing the site.
+
+- Username: `analyst`
+- Password: a strong, unique value stored only as an environment variable.
+
+The site fails closed with HTTP 503 if the password is not configured. Never commit the password or market-data API keys to GitHub.
+
+For Vercel, add `MARKETIQ_PASSWORD` under **Project → Settings → Environment Variables**, apply it to the required environments, then redeploy.
 
 ## Run locally
 
 Requirements: Node.js 20.9 or later.
+
+Set `MARKETIQ_PASSWORD` in your local environment, then run:
 
 ```bash
 npm install
 npm run dev
 ```
 
-Then open [http://localhost:3000](http://localhost:3000).
+Open [http://localhost:3000](http://localhost:3000). The browser will request the Basic Auth credentials.
+
+## Build validation
+
+GitHub Actions is configured to install dependencies and run `npm run build` on pushes and pull requests targeting `main`.
 
 ## Technology
 
@@ -49,12 +60,12 @@ Then open [http://localhost:3000](http://localhost:3000).
 
 ## Roadmap
 
-1. Dashboard foundation
-2. Licensed NSE/BSE market-data integration
-3. Interactive historical charts
-4. Company financial statements and ratios
-5. Stock screener and peer comparison
+1. Stable private dashboard and automated build checks
+2. Market-data provider with clear public-display rights
+3. Interactive historical stock and index charts
+4. Company financial statements, ratios and peer comparison
+5. Stock screener and valuation tools
 6. Portfolio tracking
-7. AI-assisted research and valuation tools
+7. AI-assisted research and valuation workflows
 
-MarketIQ is a research and analytics project, not a broker or investment-advice service.
+MarketIQ is a research tool, not a broker or investment-advice service.
