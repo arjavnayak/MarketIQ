@@ -63,46 +63,67 @@ export default function Dashboard() {
   const [marketData, setMarketData] = useState<Record<string, { price: string; change: string; positive: boolean; date: string }>>({});
   const [dataLoading, setDataLoading] = useState(true);
   const [dataError, setDataError] = useState("");
+  const [marketBreadth, setMarketBreadth] = useState<{ date: string; advances: number; declines: number; unchanged: number; total: number } | null>(null);
+  const [breadthError, setBreadthError] = useState("");
 
   useEffect(() => {
     let cancelled = false;
     async function loadMarketData() {
       const results = await Promise.all(stocks.map(async (stock) => {
         try {
-          const response = await fetch(`/api/market/ohlcv/${stock.symbol}`);
-          if (!response.ok) throw new Error(`Unable to load ${stock.symbol}`);
+          const response = await fetch(`/api/market/ohlcv/${stock.symbol}`, { cache: "no-store" });
           const payload = await response.json();
+          if (!response.ok) throw new Error(payload.error || `TejHQ returned ${response.status} for ${stock.symbol}`);
           const rows = Array.isArray(payload.data) ? payload.data : [];
-          if (rows.length < 2) return null;
+          if (rows.length === 0) throw new Error(`No TejHQ rows for ${stock.symbol}`);
           const latest = rows[rows.length - 1];
-          const previous = rows[rows.length - 2];
+          const previous = rows.length > 1 ? rows[rows.length - 2] : null;
           const close = Number(latest.close);
-          const previousClose = Number(previous.close);
-          if (!Number.isFinite(close) || !Number.isFinite(previousClose) || previousClose === 0) return null;
+          const previousClose = Number(latest.prev_close ?? previous?.close);
+          if (!Number.isFinite(close) || !Number.isFinite(previousClose) || previousClose <= 0) {
+            throw new Error(`Invalid price fields for ${stock.symbol}`);
+          }
           const pct = ((close - previousClose) / previousClose) * 100;
-          return [stock.symbol, {
+          return { symbol: stock.symbol, quote: {
             price: new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(close),
             change: `${pct >= 0 ? "+" : ""}${pct.toFixed(2)}%`,
             positive: pct >= 0,
             date: String(latest.date),
-          }] as const;
-        } catch {
-          return null;
+          } };
+        } catch (error) {
+          return { symbol: stock.symbol, error: error instanceof Error ? error.message : "Unknown data error" };
         }
       }));
+
+      let breadth: typeof marketBreadth = null;
+      let breadthMessage = "";
+      try {
+        const response = await fetch("/api/market/breadth", { cache: "no-store" });
+        const payload = await response.json();
+        if (response.ok) breadth = payload;
+        else breadthMessage = payload.error || "NSE market breadth is unavailable.";
+      } catch {
+        breadthMessage = "Could not connect to TejHQ market snapshot.";
+      }
+
       if (cancelled) return;
       const next: Record<string, { price: string; change: string; positive: boolean; date: string }> = {};
-      for (const result of results) if (result) next[result[0]] = result[1];
+      const failures: string[] = [];
+      for (const result of results) {
+        if ("quote" in result) next[result.symbol] = result.quote;
+        else failures.push(`${result.symbol}: ${result.error}`);
+      }
       setMarketData(next);
+      setMarketBreadth(breadth);
       setDataLoading(false);
-      if (Object.keys(next).length === 0) setDataError("TejHQ data is temporarily unavailable. Please try again later.");
-      else if (Object.keys(next).length < stocks.length) setDataError("Some symbols could not be loaded. Available quotes are shown.");
+      if (Object.keys(next).length === 0) setDataError(failures[0] || "TejHQ returned no stock prices.");
+      else if (failures.length > 0) setDataError(`Loaded ${Object.keys(next).length} of ${stocks.length} stocks. ${failures[0]}`);
       else setDataError("");
+      setBreadthError(breadthMessage);
     }
     loadMarketData();
     return () => { cancelled = true; };
   }, []);
-
   const liveStocks = useMemo(() => stocks.filter(stock => Boolean(marketData[stock.symbol])).map(stock => ({ ...stock, ...marketData[stock.symbol] })), [marketData]);
   const filtered = useMemo(() => liveStocks.filter(stock =>
     `${stock.symbol} ${stock.company} ${stock.sector}`.toLowerCase().includes(search.toLowerCase()) &&
@@ -128,18 +149,29 @@ export default function Dashboard() {
       <header className="topbar"><div className="top-left"><button className="icon-btn open-nav" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu size={19} /></button><div className="crumb">Workspace <span>/</span> <b>{active}</b></div></div><div className="top-actions"><div className="market-pill"><i /> {dataLoading ? "CONNECTING TEJHQ" : Object.keys(marketData).length ? "TEJHQ · EOD DATA" : "DATA UNAVAILABLE"}</div><button className="icon-btn notification" aria-label="Notifications"><Bell size={18} /><i /></button><div className="top-user">AJ</div></div></header>
       <div className="content">
         <div className="page-title"><div><div className="eyebrow">INDIA <span>·</span> MARKET SNAPSHOT</div><h1>{active === "Overview" ? "Market overview" : active}</h1><p>Your daily view of Indian equity markets and the signals moving them.</p></div><button className="snapshot-btn">Market snapshot <ChevronDown size={14} /></button></div>
-        <div className="notice"><Sparkles size={16} /><span><b>TejHQ end-of-day data.</b> Stock prices are daily closing prices, usually updated by the next morning. Index cards and index chart remain illustrative.</span><button onClick={() => setActive("Company analysis")}>Explore research <span>→</span></button></div>{dataError && <div className="notice"><span>{dataError}</span></div>}
+        <div className="notice"><Sparkles size={16} /><span><b>TejHQ end-of-day data.</b> NSE stock closes and market breadth are daily data, usually available the next morning. TejHQ does not provide NIFTY, SENSEX or BANK NIFTY index values.</span><button onClick={() => setActive("Company analysis")}>Explore research <span>→</span></button></div>{dataError && <div className="notice"><span>{dataError}</span></div>}{breadthError && <div className="notice"><span>{breadthError}</span></div>}
 
-        <section className="index-grid">{indices.map(index => <article className="index-card" key={index.name}><div className="index-top"><span>{index.name}</span><small><i /> DEMO</small></div><div className="index-value">{index.value}</div><div className={`index-change ${index.positive ? "up" : "down"}`}>{index.positive ? <ArrowUpRight size={15} /> : <ArrowDownRight size={15} />}{index.change}<span>today</span></div><div className="index-spark"><Sparkline points={index.points} positive={index.positive} /></div><div className="index-foot"><span>{index.sub}</span><span>Illustrative</span></div></article>)}</section>
+        <section className="index-grid">
+          {[
+            { name: "NSE ADVANCES", value: marketBreadth?.advances, sub: "Stocks closing higher" },
+            { name: "NSE DECLINES", value: marketBreadth?.declines, sub: "Stocks closing lower" },
+            { name: "NSE UNCHANGED", value: marketBreadth?.unchanged, sub: "Stocks with no price change" }
+          ].map(item => <article className="index-card" key={item.name}>
+            <div className="index-top"><span>{item.name}</span><small><i /> TEJHQ · EOD</small></div>
+            <div className="index-value">{dataLoading ? "…" : item.value?.toLocaleString("en-IN") ?? "—"}</div>
+            <div className="index-change"><span>{item.sub}</span></div>
+            <div className="index-foot"><span>NSE market breadth</span><span>{marketBreadth?.date ?? (breadthError ? "Unavailable" : "Waiting")}</span></div>
+          </article>)}
+        </section>
 
         <section className="primary-grid">
-          <article className="panel chart-panel"><div className="panel-head"><div><div className="panel-kicker">MARKET PERFORMANCE</div><h2>NIFTY 50 <span className="up">+0.82%</span></h2><p>Illustrative index movement</p></div><button className="select-btn">NIFTY 50 <ChevronDown size={13} /></button></div><div className="chart-value"><strong>24,854.05</strong><span>+202.45 (+0.82%)</span></div><div className="chart-wrap"><div className="y-axis"><span>25,000</span><span>24,900</span><span>24,800</span><span>24,700</span></div><div className="chart-plot"><MainChart /><div className="x-axis"><span>09:15</span><span>10:30</span><span>11:45</span><span>13:00</span><span>14:15</span><span>15:30</span></div></div></div><div className="range-tabs">{["1D", "1W", "1M", "3M", "6M", "1Y", "ALL"].map(item => <button key={item} onClick={() => setRange(item)} className={range === item ? "selected" : ""}>{item}</button>)}</div></article>
+          <article className="panel chart-panel"><div className="panel-head"><div><div className="panel-kicker">MARKET PERFORMANCE</div><h2>NIFTY 50 <span className="up">+0.82%</span></h2><p>Illustrative chart · awaiting a dedicated index data source</p></div><button className="select-btn">NIFTY 50 <ChevronDown size={13} /></button></div><div className="chart-value"><strong>24,854.05</strong><span>+202.45 (+0.82%)</span></div><div className="chart-wrap"><div className="y-axis"><span>25,000</span><span>24,900</span><span>24,800</span><span>24,700</span></div><div className="chart-plot"><MainChart /><div className="x-axis"><span>09:15</span><span>10:30</span><span>11:45</span><span>13:00</span><span>14:15</span><span>15:30</span></div></div></div><div className="range-tabs">{["1D", "1W", "1M", "3M", "6M", "1Y", "ALL"].map(item => <button key={item} onClick={() => setRange(item)} className={range === item ? "selected" : ""}>{item}</button>)}</div></article>
           <article className="panel movers"><div className="panel-head"><div><div className="panel-kicker">MARKET PULSE</div><h2>Top movers</h2><p>Selected stocks · Latest daily close</p></div><button className="text-btn" onClick={() => setActive("Markets")}>View all →</button></div><div className="mover-tabs"><button className={moverMode === "Gainers" ? "chosen" : ""} onClick={() => setMoverMode("Gainers")}>Gainers</button><button className={moverMode === "Losers" ? "chosen" : ""} onClick={() => setMoverMode("Losers")}>Losers</button></div>{moverStocks.map(stock => <div className="mover-row" key={stock.symbol}><div className="stock-logo">{stock.symbol.slice(0, 1)}</div><div className="mover-name"><b>{stock.symbol}</b><small>{stock.sector}</small></div><div className="mover-quote"><b>₹{stock.price}</b><small className={stock.positive ? "up" : "down"}>{stock.change}</small></div></div>)}</article>
         </section>
 
         <section className="lower-grid">
           <article className="panel watch-panel"><div className="panel-head"><div><div className="panel-kicker">YOUR TRACKING</div><h2>Market watchlist</h2><p>Latest available NSE daily closing prices.</p></div><button className="add-btn" onClick={() => setShowAll(value => !value)}>{showAll ? "Show fewer" : "Browse all stocks"}</button></div><div className="table-tools"><div className="search-box"><Search size={15} /><input value={search} onChange={event => setSearch(event.target.value)} placeholder="Search stocks..." /></div><select className="filter-btn" aria-label="Filter by sector" value={sectorFilter} onChange={event => setSectorFilter(event.target.value)}><option>All sectors</option>{Array.from(new Set(stocks.map(stock => stock.sector))).map(sector => <option key={sector}>{sector}</option>)}</select></div><div className="table-scroll"><table><thead><tr><th>COMPANY</th><th>SECTOR</th><th className="align-right">LAST PRICE</th><th className="align-right">CHANGE</th><th /></tr></thead><tbody>{visible.map(stock => <tr key={stock.symbol}><td><div className="company-cell"><div className="stock-logo">{stock.symbol.slice(0, 1)}</div><span><b>{stock.symbol}</b><small>{stock.company}</small></span></div></td><td><span className="sector-tag">{stock.sector}</span></td><td className="align-right mono">₹{stock.price}</td><td className={`align-right mono ${stock.positive ? "up" : "down"}`}>{stock.change}</td><td className="align-right"><button className={`star-btn ${watchlist.includes(stock.symbol) ? "starred" : ""}`} onClick={() => toggleWatch(stock.symbol)} aria-label={watchlist.includes(stock.symbol) ? "Remove from watchlist" : "Add to watchlist"}><Star size={15} fill={watchlist.includes(stock.symbol) ? "currentColor" : "none"} /></button></td></tr>)}</tbody></table>{visible.length === 0 && <div className="empty">No stocks match your search.</div>}</div><div className="table-foot"><span>{active === "Watchlist" ? "Your watchlist" : "Showing"} {visible.length} of {filtered.length} companies · {dataLoading ? "Loading prices…" : "TejHQ daily close"}</span><button onClick={() => setShowAll(value => !value)}>{showAll ? "Show less" : "View all stocks"} →</button></div></article>
-          <article className="panel sectors"><div className="panel-head"><div><div className="panel-kicker">SECTOR MONITOR</div><h2>Sector performance</h2><p>Illustrative sector returns · not yet connected</p></div></div>{[["Banking",82,"+1.42%",true],["Automobile",68,"+1.08%",true],["Energy",57,"+0.76%",true],["FMCG",42,"+0.31%",true],["Information Technology",29,"-0.64%",false],["Pharma",18,"-0.92%",false]].map(([name,width,change,positive]) => <div className="sector-row" key={String(name)}><div><span>{name}</span><b className={positive ? "up" : "down"}>{change}</b></div><div className="sector-track"><i className={positive ? "gain" : "loss"} style={{width:`${width}%`}} /></div></div>)}</article>
+          <article className="panel sectors"><div className="panel-head"><div><div className="panel-kicker">SECTOR MONITOR</div><h2>Sector performance</h2><p>Illustrative sector returns · not connected to TejHQ</p></div></div>{[["Banking",82,"+1.42%",true],["Automobile",68,"+1.08%",true],["Energy",57,"+0.76%",true],["FMCG",42,"+0.31%",true],["Information Technology",29,"-0.64%",false],["Pharma",18,"-0.92%",false]].map(([name,width,change,positive]) => <div className="sector-row" key={String(name)}><div><span>{name}</span><b className={positive ? "up" : "down"}>{change}</b></div><div className="sector-track"><i className={positive ? "gain" : "loss"} style={{width:`${width}%`}} /></div></div>)}</article>
         </section>
 
         <section className="research-grid"><article className="panel research-card"><div className="research-icon"><Sparkles size={18} /></div><div><div className="panel-kicker">COMING NEXT</div><h3>AI research analyst</h3><p>Company deep-dives, financial statement interpretation and valuation insights in one workflow.</p></div><button onClick={() => setActive("Company analysis")}>Explore →</button></article><article className="panel research-card"><div className="research-icon violet"><FileText size={18} /></div><div><div className="panel-kicker">RESEARCH DESK</div><h3>Company intelligence</h3><p>Track quarterly results, key ratios, cash flows and long-term financial performance.</p></div><button onClick={() => setActive("Company analysis")}>Explore →</button></article></section>
