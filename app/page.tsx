@@ -185,7 +185,7 @@ export default function Dashboard() {
         </section>
 
         <section className="primary-grid">
-          <article className="panel chart-panel"><div className="panel-head"><div><div className="panel-kicker">INDEX PERFORMANCE</div><h2>NIFTY 50</h2><p>Official index feed not configured</p></div></div><div className="data-empty"><div className="data-empty-icon"><ChartNoAxesCombined size={22} /></div><b>NIFTY 50 chart unavailable</b><span>MarketIQ is not displaying an invented index value or chart. Historical index data will appear here once a source with suitable display rights is configured.</span></div></article>
+          <article className="panel chart-panel"><div className="panel-head"><div><div className="panel-kicker">INDEX PERFORMANCE</div><h2>NIFTY 50</h2><p>Official index feed not configured</p></div></div><div className="data-empty"><div className="data-empty-icon"><ChartNoAxesCombined size={22} /></div><b>NIFTY 50 chart unavailable</b><span>Finvex is not displaying an invented index value or chart. Historical index data will appear here once a source with suitable display rights is configured.</span></div></article>
           <article className="panel movers"><div className="panel-head"><div><div className="panel-kicker">MARKET PULSE</div><h2>Top movers</h2><p>Selected stocks · Latest daily close</p></div><button className="text-btn" onClick={() => setActive("Markets")}>View all →</button></div><div className="mover-tabs"><button className={moverMode === "Gainers" ? "chosen" : ""} onClick={() => setMoverMode("Gainers")}>Gainers</button><button className={moverMode === "Losers" ? "chosen" : ""} onClick={() => setMoverMode("Losers")}>Losers</button></div>{moverStocks.map(stock => <div className="mover-row" key={stock.symbol}><div className="stock-logo">{stock.symbol.slice(0, 1)}</div><div className="mover-name"><b>{stock.symbol}</b><small>{stock.sector}</small></div><div className="mover-quote"><b>₹{stock.price}</b><small className={stock.positive ? "up" : "down"}>{stock.change}</small></div></div>)}</article>
         </section>
 
@@ -195,7 +195,7 @@ export default function Dashboard() {
         </section>
 
         <section className="research-grid"><article className="panel research-card"><div className="research-icon"><Sparkles size={18} /></div><div><div className="panel-kicker">COMING NEXT</div><h3>AI research analyst</h3><p>Company deep-dives, financial statement interpretation and valuation insights in one workflow.</p></div><button onClick={() => setActive("Company analysis")}>Explore →</button></article><article className="panel research-card"><div className="research-icon violet"><FileText size={18} /></div><div><div className="panel-kicker">RESEARCH DESK</div><h3>Company intelligence</h3><p>Track quarterly results, key ratios, cash flows and long-term financial performance.</p></div><button onClick={() => setActive("Company analysis")}>Explore →</button></article></section>
-        <footer className="footer"><span>MARKETIQ <b>·</b> BUILT FOR BETTER RESEARCH</span><span>Private workspace · TejHQ end-of-day stock data</span><span>India <Globe2 size={12} /></span></footer>
+        <footer className="footer"><span>FINVEX <b>·</b> BUILT FOR BETTER RESEARCH</span><span>Private workspace · TejHQ end-of-day stock data</span><span>India <Globe2 size={12} /></span></footer>
       </div>
     </section>
   </main>;
