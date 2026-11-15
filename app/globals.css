@@ -34,3 +34,22 @@ button,input{font:inherit}button{cursor:pointer}
 .data-empty b{font:600 12px Manrope,sans-serif;color:#dce6ef}
 .data-empty span{max-width:390px;font-size:10px;line-height:1.7;color:#8193a6}
 .sector-empty{min-height:275px;margin-top:0}
+
+
+.heatmap-panel{margin-bottom:16px;padding:18px}
+.heatmap-heading{align-items:center;margin-bottom:15px}
+.heatmap-heading h2{font:650 16px Manrope,sans-serif;margin:6px 0 5px}
+.heatmap-legend{display:flex;gap:12px;flex-wrap:wrap;color:#91a2b4;font-size:9px}
+.heatmap-legend span{display:flex;align-items:center;gap:5px}
+.heatmap-legend i{width:8px;height:8px;border-radius:2px;display:inline-block}
+.legend-up{background:#168c68}.legend-down{background:#bd334b}.legend-na{background:#536273}
+.heatmap-canvas{position:relative;width:100%;height:390px;overflow:hidden;border:1px solid #243345;border-radius:8px;background:#0a121c}
+.heatmap-tile{position:absolute;border:2px solid #0a121c;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;overflow:hidden;gap:4px;padding:4px;color:#f4f7fb;transition:filter .15s;min-width:0;min-height:0}
+.heatmap-tile:hover{filter:brightness(1.25);z-index:2;outline:1px solid #d7e8f6}
+.heatmap-tile b{font:700 clamp(7px,1.05vw,13px) Manrope,sans-serif;letter-spacing:-.2px;max-width:100%;overflow:hidden;text-overflow:ellipsis}
+.heatmap-tile span{font:500 clamp(7px,.95vw,12px) 'DM Mono',monospace}
+.heatmap-tile small{font:8px 'DM Mono',monospace;color:#ffffffb5}
+.heatmap-tile.compact{padding:1px;gap:1px}
+.heatmap-tile.compact b{font-size:clamp(5px,.7vw,9px)}
+.heatmap-foot{display:flex;justify-content:space-between;gap:12px;color:#718397;font:8px 'DM Mono',monospace;padding-top:10px}
+@media(max-width:560px){.heatmap-canvas{height:310px}.heatmap-heading{align-items:flex-start;flex-direction:column}.heatmap-legend{gap:9px}.heatmap-foot{flex-direction:column;gap:5px}}
