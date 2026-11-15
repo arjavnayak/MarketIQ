@@ -185,10 +185,8 @@ export default function Dashboard() {
 
   const heatmapRects = splitHeatmap(heatmapItems, 0, 0, 100, 100);
   function heatColor(change?: string, positive?: boolean) {
-    if (change === undefined || positive === undefined) return "#263443";
-    const value = Math.min(Math.abs(Number.parseFloat(change)) / 5, 1);
-    const alpha = 0.28 + value * 0.58;
-    return positive ? `rgba(13, 139, 94, ${alpha})` : `rgba(190, 43, 66, ${alpha})`;
+    if (change === undefined || positive === undefined) return "#374151";
+    return positive ? "#55C98A" : "#E5394F";
   }
 
 
@@ -213,7 +211,7 @@ export default function Dashboard() {
 
         <section className="panel heatmap-panel">
           <div className="panel-head heatmap-heading">
-            <div><div className="panel-kicker">NIFTY 50 · MARKET MAP</div><h2>Market heatmap</h2><p>Box area represents official NIFTY 50 index weight · daily change versus previous close</p></div>
+            <div><div className="panel-kicker">NIFTY 50 · MARKET MAP</div><h2>Market heatmap</h2><p>Box size reflects relative NIFTY 50 index weight · daily change versus previous close</p></div>
             <div className="heatmap-legend"><span><i className="legend-up" /> Gainers</span><span><i className="legend-down" /> Losers</span><span><i className="legend-na" /> Unavailable</span></div>
           </div>
           <div className="heatmap-canvas">
@@ -223,10 +221,9 @@ export default function Dashboard() {
               const compact = area < 5;
               return <div key={item.symbol} className={`heatmap-tile ${compact ? "compact" : ""}`}
                 style={{ left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%`, background: heatColor(quote?.change, quote?.positive) }}
-                title={`${item.stock?.company ?? item.symbol} · Weight ${item.weight}% · ${quote ? quote.change : "Price unavailable"} · Market cap source: NSE Indices, 30 Oct 2026`}>
+                title={`${item.stock?.company ?? item.symbol} · ${quote ? quote.change : "Price unavailable"} · NIFTY 50 index weight source: NSE Indices, 30 Oct 2026` }>
                 <b>{item.symbol}</b>
                 {!compact && <span>{quote?.change ?? "Unavailable"}</span>}
-                {!compact && area > 8 && <small>{item.weight.toFixed(2)}% weight</small>}
               </div>;
             })}
           </div>
