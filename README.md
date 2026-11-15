@@ -1,8 +1,8 @@
-# MarketIQ
+# Finvex
 
 **Indian Stock Market Intelligence Platform**
 
-MarketIQ is a private research and analytics workspace for Indian equities, inspired by professional financial terminals.
+Finvex is a private research and analytics workspace for Indian equities, inspired by professional financial terminals.
 
 ## Current status
 
@@ -18,26 +18,26 @@ The dashboard foundation includes:
 
 ## Market-data restrictions
 
-The current TejHQ integration provides end-of-day NSE stock data. Its free-data terms restrict use to private personal dashboards and do not establish permission to display or redistribute the data on a public product. Keep MarketIQ private while using this source. Do not enable public access or redistribute raw market data unless the relevant provider and exchange display rights explicitly permit it.
+The current TejHQ integration provides end-of-day NSE stock data. Its free-data terms restrict use to private personal dashboards and do not establish permission to display or redistribute the data on a public product. Keep Finvex private while using this source. Do not enable public access or redistribute raw market data unless the relevant provider and exchange display rights explicitly permit it.
 
 TejHQ does not supply official NIFTY 50, SENSEX or BANK NIFTY index values through the current integration. Those charts remain unavailable until a suitable data source is approved.
 
 ## Private access
 
-The application uses HTTP Basic Authentication. Configure the environment variable `MARKETIQ_PASSWORD` in the hosting provider before accessing the site.
+The application uses HTTP Basic Authentication. Configure the environment variable `FINVEX_PASSWORD` in the hosting provider before accessing the site.
 
 - Username: `analyst`
 - Password: a strong, unique value stored only as an environment variable.
 
 The site fails closed with HTTP 503 if the password is not configured. Never commit the password or market-data API keys to GitHub.
 
-For Vercel, add `MARKETIQ_PASSWORD` under **Project → Settings → Environment Variables**, apply it to the required environments, then redeploy.
+For Vercel, add `FINVEX_PASSWORD` under **Project → Settings → Environment Variables**, apply it to the required environments, then redeploy.
 
 ## Run locally
 
 Requirements: Node.js 20.9 or later.
 
-Set `MARKETIQ_PASSWORD` in your local environment, then run:
+Set `FINVEX_PASSWORD` in your local environment, then run:
 
 ```bash
 npm install
@@ -68,4 +68,4 @@ GitHub Actions is configured to install dependencies and run `npm run build` on 
 6. Portfolio tracking
 7. AI-assisted research and valuation workflows
 
-MarketIQ is a research tool, not a broker or investment-advice service.
+Finvex is a research tool, not a broker or investment-advice service.
