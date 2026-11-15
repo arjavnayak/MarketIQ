@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { nifty50Weights } from "./data/nifty50-weights";
 import {
   Activity, Bell, Building2, ChartNoAxesCombined, ChevronDown, CircleHelp,
   FileText, Globe2, LayoutDashboard, Menu, Newspaper, Search, Settings2,
@@ -152,6 +153,44 @@ export default function Dashboard() {
   ), [marketData, search, active, watchlist, sectorFilter]);
   const moverStocks = liveStocks.filter(stock => moverMode === "Gainers" ? stock.positive : !stock.positive).slice(0, 4);
   const visible = showAll ? filtered : filtered.slice(0, 5);
+  const heatmapItems = useMemo(() => {
+    const items = nifty50Weights.map(item => ({
+      ...item,
+      stock: stocks.find(stock => stock.symbol === item.symbol),
+      quote: marketData[item.symbol],
+    })).filter(item => item.stock);
+    return items.sort((a, b) => b.weight - a.weight);
+  }, [marketData]);
+
+  function splitHeatmap(items: typeof heatmapItems, x: number, y: number, w: number, h: number): Array<{ item: typeof heatmapItems[number]; x: number; y: number; w: number; h: number }> {
+    if (items.length === 0) return [];
+    if (items.length === 1) return [{ item: items[0], x, y, w, h }];
+    const total = items.reduce((sum, item) => sum + item.weight, 0);
+    let running = 0;
+    let cut = 1;
+    for (; cut < items.length; cut++) {
+      running += items[cut - 1].weight;
+      if (running >= total / 2) break;
+    }
+    const first = items.slice(0, cut);
+    const firstWeight = first.reduce((sum, item) => sum + item.weight, 0);
+    const ratio = firstWeight / total;
+    if (w >= h) {
+      const firstW = w * ratio;
+      return [...splitHeatmap(first, x, y, firstW, h), ...splitHeatmap(items.slice(cut), x + firstW, y, w - firstW, h)];
+    }
+    const firstH = h * ratio;
+    return [...splitHeatmap(first, x, y, w, firstH), ...splitHeatmap(items.slice(cut), x, y + firstH, w, h - firstH)];
+  }
+
+  const heatmapRects = splitHeatmap(heatmapItems, 0, 0, 100, 100);
+  function heatColor(change?: string, positive?: boolean) {
+    if (change === undefined || positive === undefined) return "#263443";
+    const value = Math.min(Math.abs(Number.parseFloat(change)) / 5, 1);
+    const alpha = 0.28 + value * 0.58;
+    return positive ? `rgba(13, 139, 94, ${alpha})` : `rgba(190, 43, 66, ${alpha})`;
+  }
+
 
   function toggleWatch(symbol: string) {
     setWatchlist(current => current.includes(symbol) ? current.filter(item => item !== symbol) : [...current, symbol]);
@@ -170,6 +209,29 @@ export default function Dashboard() {
       <div className="content">
         <div className="page-title"><div><div className="eyebrow">INDIA <span>·</span> MARKET SNAPSHOT</div><h1>{active === "Overview" ? "Market overview" : active}</h1><p>Your daily view of Indian equity markets and the signals moving them.</p></div><button className="snapshot-btn">Market snapshot <ChevronDown size={14} /></button></div>
         <div className="notice"><Sparkles size={16} /><span><b>TejHQ end-of-day data.</b> NSE stock closes and market breadth are daily data, usually available the next morning. TejHQ does not provide NIFTY, SENSEX or BANK NIFTY index values.</span><button onClick={() => setActive("Company analysis")}>Explore research <span>→</span></button></div>{dataError && <div className="notice"><span>{dataError}</span></div>}{breadthError && <div className="notice"><span>{breadthError}</span></div>}
+
+
+        <section className="panel heatmap-panel">
+          <div className="panel-head heatmap-heading">
+            <div><div className="panel-kicker">NIFTY 50 · MARKET MAP</div><h2>Market heatmap</h2><p>Box area represents official NIFTY 50 index weight · daily change versus previous close</p></div>
+            <div className="heatmap-legend"><span><i className="legend-up" /> Gainers</span><span><i className="legend-down" /> Losers</span><span><i className="legend-na" /> Unavailable</span></div>
+          </div>
+          <div className="heatmap-canvas">
+            {heatmapRects.map(({ item, x, y, w, h }) => {
+              const quote = item.quote;
+              const area = w * h;
+              const compact = area < 5;
+              return <div key={item.symbol} className={`heatmap-tile ${compact ? "compact" : ""}`}
+                style={{ left: `${x}%`, top: `${y}%`, width: `${w}%`, height: `${h}%`, background: heatColor(quote?.change, quote?.positive) }}
+                title={`${item.stock?.company ?? item.symbol} · Weight ${item.weight}% · ${quote ? quote.change : "Price unavailable"} · Market cap source: NSE Indices, 30 Oct 2026`}>
+                <b>{item.symbol}</b>
+                {!compact && <span>{quote?.change ?? "Unavailable"}</span>}
+                {!compact && area > 8 && <small>{item.weight.toFixed(2)}% weight</small>}
+              </div>;
+            })}
+          </div>
+          <div className="heatmap-foot"><span>Weight source: NSE Indices · NIFTY 50 constituents · 30 Oct 2026</span><span>Price source: TejHQ · EOD</span></div>
+        </section>
 
         <section className="index-grid">
           {[
